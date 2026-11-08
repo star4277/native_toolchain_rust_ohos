@@ -17,10 +17,17 @@ void main() {
     });
 
     test('invoke succeeds with exit code 0', () async {
-      final result = await processRunner.invoke('echo', ['hello']);
+      final executable = Platform.isWindows ? 'cmd.exe' : 'echo';
+      final arguments = Platform.isWindows
+          ? ['/c', 'echo', 'hello']
+          : ['hello'];
+      final result = await processRunner.invoke(executable, arguments);
       expect(result.trim(), equals('hello'));
       expect(records, hasLength(1));
-      expect(records.single.message, contains('Invoking "echo [hello]'));
+      expect(
+        records.single.message,
+        contains('Invoking "$executable $arguments"'),
+      );
     });
 
     test('invoke throws RustProcessException on non-zero exit code', () {

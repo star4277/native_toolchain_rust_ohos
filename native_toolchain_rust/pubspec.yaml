@@ -12,8 +12,16 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
-  code_assets: ^2.1.0
-  hooks: ^2.1.0
+  code_assets:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_dart_native.git
+      path: pkgs/code_assets
+      ref: flutter_3.47.7_deps
+  hooks:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_dart_native.git
+      path: pkgs/hooks
+      ref: flutter_3.47.7_deps
   logging: ^1.3.0
   meta: ^1.17.0
   path: ^1.9.1

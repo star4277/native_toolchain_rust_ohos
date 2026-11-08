@@ -11,8 +11,29 @@ workspace:
   - examples/flutter
 
 dev_dependencies:
-  melos: ^8.10.0
+  # The OHOS fork's ffigen requires cli_util ^0.4.2; Melos >=7.8.2
+  # requires cli_util ^0.5.0 or newer.
+  melos: 7.8.1
   very_good_analysis: ^11.0.0
+
+# Git dependencies' own overrides are ignored by Pub. Keep the native
+# toolchain's transitive dependencies on the same OHOS fork and branch.
+dependency_overrides:
+  code_assets:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_dart_native.git
+      path: pkgs/code_assets
+      ref: flutter_3.47.7_deps
+  hooks:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_dart_native.git
+      path: pkgs/hooks
+      ref: flutter_3.47.7_deps
+  native_toolchain_c:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_dart_native.git
+      path: pkgs/native_toolchain_c
+      ref: flutter_3.47.7_deps
 
 melos:
   scripts:

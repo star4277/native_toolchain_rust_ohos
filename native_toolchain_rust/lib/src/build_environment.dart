@@ -22,6 +22,11 @@ interface class BuildEnvironmentFactory {
             .join(':'),
       },
 
+      if (codeConfig.rustTargetOS == OS.ohos)
+        ...const OhosBuildEnvironmentFactory().createBuildEnvVars(
+          codeConfig: codeConfig,
+        ),
+
       if (codeConfig.targetOS == OS.android)
         ...const AndroidBuildEnvironmentFactory().createBuildEnvVars(
           codeConfig: codeConfig,
@@ -97,6 +102,68 @@ interface class AndroidBuildEnvironmentFactory {
       'RANLIB_$targetTripleEnvVar': ranlibPath,
       'CARGO_TARGET_${targetTripleEnvVar.toUpperCase()}_LINKER': clangPath,
       'BINDGEN_EXTRA_CLANG_ARGS_$targetTripleEnvVar': bindgenClangArgs,
+    };
+  }
+}
+
+@internal
+interface class OhosBuildEnvironmentFactory {
+  const OhosBuildEnvironmentFactory({this.environment});
+
+  final Map<String, String>? environment;
+
+  Map<String, String> createBuildEnvVars({required CodeConfig codeConfig}) {
+    final CodeConfig(:targetTriple, :cCompiler) = codeConfig;
+    if (cCompiler == null) {
+      throw UnsupportedError(
+        'CCompilerConfig was not provided but is required for $targetTriple',
+      );
+    }
+    final sdkPath = (environment ?? Platform.environment)['OHOS_SDK_HOME'];
+    if (sdkPath == null || sdkPath.isEmpty) {
+      throw UnsupportedError('OHOS SDK native path is not set');
+    }
+    final exe = Platform.isWindows ? '.exe' : '';
+    final binDir = path.join(sdkPath, 'llvm', 'bin');
+    final clangPath = path.join(binDir, 'clang$exe');
+    final sysroot = path.join(sdkPath, 'sysroot');
+    final clangTarget = switch (targetTriple) {
+      'aarch64-unknown-linux-ohos' => 'aarch64-linux-ohos',
+      'armv7-unknown-linux-ohos' => 'arm-linux-ohos',
+      'x86_64-unknown-linux-ohos' => 'x86_64-linux-ohos',
+
+      _ => throw UnsupportedError('Unsupported OHOS target: $targetTriple'),
+    };
+
+    final targetEnv = targetTriple.replaceAll('-', '_');
+    final linkerEnvVar = 'CARGO_TARGET_${targetEnv.toUpperCase()}_LINKER';
+    final rustFlagsEnvVar = 'CARGO_TARGET_${targetEnv.toUpperCase()}_RUSTFLAGS';
+    // bindgen uses shell quoting; avoid Windows backslashes in its arguments.
+    final sysrootArg = sysroot.replaceAll(r'\', '/');
+    final includeDir = path
+        .join(sysroot, 'usr', 'include', clangTarget)
+        .replaceAll(r'\', '/');
+    final clangFlags = [
+      '--target=$clangTarget',
+      '--sysroot=$sysrootArg',
+      '-I$includeDir',
+      '-D__MUSL__',
+      if (codeConfig.targetArchitecture == Architecture.arm) '-march=armv7a',
+    ].join(' ');
+    final rustFlags =
+        '-C link-arg=--target=$clangTarget '
+        '-C link-arg=-fuse-ld=lld '
+        '-C link-arg=--sysroot=$sysrootArg';
+    return {
+      rustFlagsEnvVar: rustFlags,
+      linkerEnvVar: clangPath,
+      'CC_$targetEnv': clangPath,
+      'CXX_$targetEnv': path.join(binDir, 'clang++$exe'),
+      'AR_$targetEnv': path.join(binDir, 'llvm-ar$exe'),
+      'RANLIB_$targetEnv': path.join(binDir, 'llvm-ranlib$exe'),
+      'CFLAGS_$targetEnv': clangFlags,
+      'CXXFLAGS_$targetEnv': clangFlags,
+      'BINDGEN_EXTRA_CLANG_ARGS_$targetEnv': clangFlags,
     };
   }
 }

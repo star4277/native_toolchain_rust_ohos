@@ -53,7 +53,8 @@ interface class RustBuildRunner {
 
     logger.info('Gathering all data required for the build');
     final codeConfig = input.config.code;
-    final CodeConfig(:targetOS, :targetTriple, :linkMode) = codeConfig;
+    final targetOS = codeConfig.rustTargetOS;
+    final CodeConfig(:targetTriple, :linkMode) = codeConfig;
     final RustBuilder(
       :assetName,
       :cratePath,
