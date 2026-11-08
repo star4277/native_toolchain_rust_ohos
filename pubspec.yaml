@@ -9,6 +9,7 @@ workspace:
   - native_toolchain_rust
   - examples/dart_only
   - examples/flutter
+  - frb_hooks_ohos
 
 dev_dependencies:
   # The OHOS fork's ffigen requires cli_util ^0.4.2; Melos >=7.8.2
