@@ -109,7 +109,7 @@ Future<void> main(List<String> args) async {
 
 ## OHOS SDK 配置
 
-本构建器将 `OHOS_SDK_HOME` 解释为 **native SDK 目录**，其中应包含：
+本构建器使用的 **native SDK 目录**应包含：
 
 ```text
 native/
@@ -121,14 +121,18 @@ native/
   sysroot/
 ```
 
-Windows PowerShell 当前会话配置示例：
+构建器优先使用 **hook 进程中**非空的 `OHOS_SDK_HOME`；没有该变量时，从 Flutter 传入的 `cCompiler.compiler`（`native/llvm/bin/clang[.exe]`）推导 native 目录，并检查 `build/cmake/ohos.toolchain.cmake`。解析出的目录也会作为 `OHOS_SDK_HOME` 传给 Cargo 和 Rust 的 build scripts。
+
+当前定制 Flutter 的 `hooks_runner` 仅传递白名单环境变量，并关闭父进程环境继承，白名单没有 `OHOS_SDK_HOME`。因此，即使终端或系统变量已设置，hook 仍可能读不到它；这时会自动使用 hook 输入中的编译器 SDK，不需要通过反复重启终端解决。本库不会读取 Windows 注册表或猜测本机安装目录。
+
+直接执行 hook 等会传递该变量的场景，可以用它覆盖 SDK，例如 Windows PowerShell：
 
 ```powershell
 $env:OHOS_SDK_HOME = 'D:\Huawei\SDK\20\native'
 fvm flutter pub get
 ```
 
-如果在系统环境变量界面设置，请重启终端、IDE 以及启动构建的进程，使其继承新值。Flutter/DevEco 自身的 SDK 发现配置也需要正确；本变量的上述目录约定用于本库的编译参数，不能替代 Flutter 提供有效的 `CCompilerConfig`。
+Flutter/DevEco 自身的 SDK 发现配置必须正确，向 hook 提供有效的 `CCompilerConfig`。变量存在时必须指向上述 native 目录；变量无法传入 hook 时，以 Flutter 实际传入的编译器路径为准。
 
 构建器为 Rust linker、C/C++ 编译和 bindgen 配置对应的 target、sysroot、架构头文件目录及工具路径。通过 CMake 构建的 Rust 依赖可能还需要在其自身配置中传入 `build/cmake/ohos.toolchain.cmake`，CFLAGS 等变量不能替代所有第三方构建系统的配置。
 
@@ -160,15 +164,16 @@ HAP 构建命令由所使用的定制 Flutter SDK 提供，需要应用已配置
 fvm flutter pub upgrade native_toolchain_rust
 ```
 
-出现 `hooks from hosted` 与 `hooks from git` 冲突时，先检查消费项目根级依赖覆盖。出现缺少 `CCompilerConfig` 或 SDK native path 错误时，分别检查 Flutter 的 SDK 发现配置和构建进程中的 `OHOS_SDK_HOME`。
+出现 `hooks from hosted` 与 `hooks from git` 冲突时，先检查消费项目根级依赖覆盖。出现缺少 `CCompilerConfig` 或无法确定 native SDK 的错误时，检查 Flutter 传入的编译器路径及其所属 SDK 的 `build/cmake/ohos.toolchain.cmake`，并确认 lockfile 已更新到包含 SDK 自动发现修复的提交。
 
 ## 当前验证范围
 
-- 44 个单元测试通过，覆盖 Rust 工具链辅助逻辑、OHOS 平台兼容、FRB 配置及构建锁。
+- 49 个单元测试通过，覆盖 Rust 工具链辅助逻辑、OHOS 平台兼容、环境变量过滤后的 SDK 自动发现、显式 SDK 优先级、FRB 配置及构建锁。
 - 已在 Windows 主机上用 OHOS SDK 验证 arm64、x64、armv7 的 C/C++ 编译和 `.so` 链接。
 - 构建锁已验证同一 isolate 内排队、跨进程等待及异常后的再次获取。
 - 静态检查没有 Dart 代码错误；定制 Git/path 依赖仍会产生发布配置警告。本仓库当前按 Git 依赖方式使用。
-- 完整 FRB 代码生成、Rust crate 到 HAP 的构建及设备运行尚未验证；接入后仍需针对应用实际依赖做完整构建测试。
+- 已在 Windows 上对 FRB `myapp` 执行实际 build hook，使用定制 Flutter 的环境白名单并关闭父进程环境继承；成功构建 `x86_64-unknown-linux-ohos` 的 release `.so` 并注册 Native Asset。该测试使用本地 FRB runtime 源码。
+- HAP 打包及设备运行尚未验证；接入后仍需手动验证签名、打包及真机调用。
 
 ## 上游与许可证
 

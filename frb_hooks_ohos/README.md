@@ -68,7 +68,9 @@ Future<void> main(List<String> args) async {
 
 配置示例、架构表和安装要求见根 [README 的 Rust 配置](../README.md#rust-crate-配置) 与 [OHOS SDK 配置](../README.md#ohos-sdk-配置)。
 
-`OHOS_SDK_HOME` 在本库中必须指向包含 `llvm/`、`sysroot/` 的 native SDK 目录，例如 PowerShell：
+构建器在 hook 进程能收到非空 `OHOS_SDK_HOME` 时优先使用它，该变量必须指向包含 `llvm/`、`sysroot/` 的 native SDK 目录。没有该变量时，自动从 Flutter 传入的 `native/llvm/bin/clang[.exe]` 路径识别 SDK，并检查 `build/cmake/ohos.toolchain.cmake`。
+
+当前定制 Flutter 的 `hooks_runner` 不会转发 `OHOS_SDK_HOME`，所以终端中已设置也不代表 hook 中可见。正常 Flutter 构建通过上述编译器路径自动发现 SDK；解析出的目录会作为 `OHOS_SDK_HOME` 传给 Cargo 和 Rust build scripts。直接执行 hook 等允许传递该变量的场景，可这样指定 SDK：
 
 ```powershell
 $env:OHOS_SDK_HOME = 'D:\Huawei\SDK\20\native'
@@ -76,7 +78,7 @@ fvm flutter pub get
 fvm flutter build hap
 ```
 
-设置永久环境变量后，请重启终端和 IDE。Flutter 自身还必须能发现 OHOS SDK 并向 hook 提供有效的 C 编译器配置。
+Flutter 自身必须能发现 OHOS SDK 并向 hook 提供有效的 C 编译器配置。环境被过滤时，本库采用该配置中的 SDK，不会从 Windows 系统变量界面重新读取路径。
 
 **项目、SDK、Rust 工具链及临时目录的路径不要包含空格。** Windows 的 Cargo 产物会放入系统临时目录下的 `frb_native_assets_<hash>/`，所以也要检查该临时目录路径。
 
@@ -103,6 +105,6 @@ fvm flutter build hap
 
 ## 当前验证范围
 
-本仓库共 44 个单元测试通过，已验证 FRB 配置、Windows 短路径、构建锁，以及 OHOS 三种架构的 C/C++ 编译和动态库链接。完整 FRB 代码生成、Rust 构建、HAP 打包和设备运行尚未验证，需在接入应用中继续验证。
+本仓库共 49 个单元测试通过，已验证 FRB 配置、Windows 短路径、构建锁、环境变量被过滤时的 SDK 自动发现，以及 OHOS 三种架构的 C/C++ 编译和动态库链接。在 Windows 上使用实际 FRB `myapp` build hook 和定制 Flutter 的环境白名单，已成功构建并注册 x64 OHOS 的 Rust release `.so`；该测试使用本地 FRB runtime。HAP 打包和设备运行仍需在接入应用中手动验证。
 
 FRB 本身的使用说明见 [fzyzcjy/flutter_rust_bridge](https://github.com/fzyzcjy/flutter_rust_bridge)；本仓库的定制依赖和 OHOS 接入以这里及根 README 为准。

@@ -119,9 +119,19 @@ interface class OhosBuildEnvironmentFactory {
         'CCompilerConfig was not provided but is required for $targetTriple',
       );
     }
-    final sdkPath = (environment ?? Platform.environment)['OHOS_SDK_HOME'];
-    if (sdkPath == null || sdkPath.isEmpty) {
-      throw UnsupportedError('OHOS SDK native path is not set');
+    final configuredSdk =
+        (environment ?? Platform.environment)['OHOS_SDK_HOME'];
+    // hooks_runner filters parent environment variables. Use the compiler SDK
+    // from the hook input when OHOS_SDK_HOME is not forwarded to this process.
+    final sdkPath = configuredSdk != null && configuredSdk.isNotEmpty
+        ? configuredSdk
+        : codeConfig.ohosSdkRoot;
+    if (sdkPath == null) {
+      throw UnsupportedError(
+        'OHOS native SDK could not be determined. '
+        'Provide an OHOS CCompilerConfig with build/cmake/ohos.toolchain.cmake '
+        'in its SDK, or set OHOS_SDK_HOME in the hook environment.',
+      );
     }
     final exe = Platform.isWindows ? '.exe' : '';
     final binDir = path.join(sdkPath, 'llvm', 'bin');
@@ -155,6 +165,8 @@ interface class OhosBuildEnvironmentFactory {
         '-C link-arg=-fuse-ld=lld '
         '-C link-arg=--sysroot=$sysrootArg';
     return {
+      // Make the resolved SDK available to Cargo and crates' build scripts too.
+      'OHOS_SDK_HOME': sdkPath,
       rustFlagsEnvVar: rustFlags,
       linkerEnvVar: clangPath,
       'CC_$targetEnv': clangPath,

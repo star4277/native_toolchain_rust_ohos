@@ -9,11 +9,15 @@ extension CodeConfigMapping on CodeConfig {
   OS get rustTargetOS {
     if (targetOS != OS.linux) return targetOS;
 
-    final compiler = cCompiler?.compiler;
-    if (compiler == null) return OS.linux;
-
     // Some OHOS SDKs pass Linux to hooks, but still supply the OHOS compiler.
-    // Identify its native SDK directory without changing regular Linux builds.
+    return ohosSdkRoot != null ? OS.ohos : OS.linux;
+  }
+
+  String? get ohosSdkRoot {
+    final compiler = cCompiler?.compiler;
+    if (compiler == null) return null;
+
+    // Identify native/llvm/bin/clang by its SDK's OHOS CMake toolchain marker.
     final nativeRoot = path.dirname(
       path.dirname(path.dirname(path.fromUri(compiler))),
     );
@@ -23,7 +27,7 @@ extension CodeConfigMapping on CodeConfig {
       'cmake',
       'ohos.toolchain.cmake',
     );
-    return File(toolchainFile).existsSync() ? OS.ohos : OS.linux;
+    return File(toolchainFile).existsSync() ? nativeRoot : null;
   }
 
   String get targetTriple {

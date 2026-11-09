@@ -72,6 +72,25 @@ void main() {
   ];
 
   for (final target in targets) {
+    test('OHOS ${target.arch} finds SDK without environment variables', () {
+      final sysroot = path.join(sdk.path, 'sysroot').replaceAll(r'\', '/');
+      for (final os in [OS.ohos, OS.linux]) {
+        for (final environment in [
+          <String, String>{},
+          {'OHOS_SDK_HOME': ''},
+        ]) {
+          final env = OhosBuildEnvironmentFactory(environment: environment)
+              .createBuildEnvVars(
+                codeConfig: config(os, target.arch, compiler: ohosCompiler),
+              );
+          final targetEnv = target.rust.replaceAll('-', '_');
+          expect(env['OHOS_SDK_HOME'], sdk.path);
+          expect(env['CC_$targetEnv'], path.fromUri(ohosCompiler.compiler));
+          expect(env['CFLAGS_$targetEnv'], contains('--sysroot=$sysroot'));
+        }
+      }
+    });
+
     test('OHOS ${target.arch} supports both SDK platform representations', () {
       final ohos = config(OS.ohos, target.arch, compiler: ohosCompiler);
       final compatibility = config(
@@ -195,16 +214,63 @@ void main() {
     );
   });
 
-  test('OHOS environment reports missing SDK configuration', () {
-    expect(
-      () =>
-          const OhosBuildEnvironmentFactory(environment: {}).createBuildEnvVars(
-            codeConfig: config(
-              OS.ohos,
-              Architecture.arm64,
-              compiler: ohosCompiler,
-            ),
+  test('OHOS environment preserves an explicit SDK override', () {
+    final overridePath = path.join(sdk.path, 'other_native_sdk');
+    final env =
+        OhosBuildEnvironmentFactory(
+          environment: {'OHOS_SDK_HOME': overridePath},
+        ).createBuildEnvVars(
+          codeConfig: config(
+            OS.ohos,
+            Architecture.arm64,
+            compiler: ohosCompiler,
           ),
+        );
+    final exe = Platform.isWindows ? '.exe' : '';
+    expect(env['OHOS_SDK_HOME'], overridePath);
+    expect(
+      env['CC_aarch64_unknown_linux_ohos'],
+      path.join(overridePath, 'llvm', 'bin', 'clang$exe'),
+    );
+    expect(
+      env['CFLAGS_aarch64_unknown_linux_ohos'],
+      contains(
+        '--sysroot=${path.join(overridePath, 'sysroot').replaceAll(r'\', '/')}',
+      ),
+    );
+  });
+
+  test(
+    'OHOS environment reports missing SDK when compiler is unidentifiable',
+    () {
+      File(
+        path.join(sdk.path, 'build', 'cmake', 'ohos.toolchain.cmake'),
+      ).deleteSync();
+      expect(
+        () => const OhosBuildEnvironmentFactory(environment: {})
+            .createBuildEnvVars(
+              codeConfig: config(
+                OS.ohos,
+                Architecture.arm64,
+                compiler: ohosCompiler,
+              ),
+            ),
+        throwsA(
+          isA<UnsupportedError>().having(
+            (error) => error.message,
+            'message',
+            allOf(contains('OHOS_SDK_HOME'), contains('CCompilerConfig')),
+          ),
+        ),
+      );
+    },
+  );
+
+  test('OHOS environment still requires a C compiler configuration', () {
+    expect(
+      () => OhosBuildEnvironmentFactory(
+        environment: {'OHOS_SDK_HOME': sdk.path},
+      ).createBuildEnvVars(codeConfig: config(OS.ohos, Architecture.arm64)),
       throwsUnsupportedError,
     );
   });
